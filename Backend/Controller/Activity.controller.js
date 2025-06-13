@@ -1,89 +1,194 @@
 import multer from 'multer';
 import path from 'path';
 import ActivityModel from '../Models/Activity.models.js';
-import upload_on_cloudinary from "../utils/cloudinary.js"; // Function for uploading to Cloudinary
+import upload_on_cloudinary from "../utils/cloudinary.js";
 import fs from 'fs';
 
-// Multer setup for video file upload
+const allowedTopics = ["Archimedes", "Marie Curie", "Tesla", "Einstein"];
+const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+const allowedVideoTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/webm'];
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/videos'); // Store videos in 'uploads/videos' folder
+    const uploadPath = path.join('uploads', 'temp');
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
   },
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}_${file.originalname}`); // Unique file name using timestamp
+    cb(null, `${Date.now()}_${file.originalname}`);
   }
 });
 
-const fileFilter = (req, file, cb) => {
-  const allowedTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/webm']; // Allowed video formats
+// 🧩 Multer filters (separate for image and video)
+const videoFilter = (req, file, cb) => {
+  const allowedTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/webm'];
   if (!allowedTypes.includes(file.mimetype)) {
     return cb(new Error('Invalid file type, only video files are allowed!'), false);
   }
   cb(null, true);
 };
 
-const upload = multer({ storage, fileFilter });
-
-// Controller function for sharing/uploading a video for a specific activity
-const uploadVideoForActivity = async (req, res) => {
-  const { activityNumber } = req.params; // Get the activity number from the URL
-  if (!activityNumber) {
-    return res.status(400).json({ "error": "Activity number is required" });
+const imageFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+  if (!allowedTypes.includes(file.mimetype)) {
+    return cb(new Error('Invalid file type, only image files are allowed!'), false);
   }
+  cb(null, true);
+};
 
-  const videoFile = req.file?.path; // Path of the uploaded file
-  if (!videoFile) {
-    return res.status(400).json({ "error": "Video file is required" });
-  }
-
+// Expose two different uploaders
+const uploadVideo = multer({ storage, fileFilter: videoFilter });
+const uploadImage = multer({ storage, fileFilter: imageFilter });
+const uploadImageForActivity = async (req, res) => {
   try {
-    // Upload the video to Cloudinary
-    const cloudUrl = await upload_on_cloudinary(videoFile);
-    if (!cloudUrl) {
-      return res.status(400).json({ "error": "Error uploading file to Cloudinary" });
+    const { userId, topic, activityNo } = req.params;
+
+    if (!userId || !topic || !activityNo) {
+      return res.status(400).json({ error: "Missing required parameters (userId, topic, activityNo)" });
     }
 
-    // Extract the poster image URL (thumbnail) from the 'eager' array
-    const posterImageUrl = cloudUrl.eager[0]?.url; // Get the video thumbnail URL from Cloudinary
+    if (!allowedTopics.includes(topic)) {
+      return res.status(400).json({ error: `Invalid topic '${topic}'. Valid topics: ${allowedTopics.join(", ")}` });
+    }
 
-    // Save video and poster image URLs in the database
+    // Check if activity already exists
+    const existingActivity = await ActivityModel.findOne({
+      userId,
+      topic,
+      activityNo,
+      activityType: 'photo'
+    });
+
+    if (existingActivity) {
+      return res.status(400).json({ error: "Image for this activity number and topic already exists." });
+    }
+
+    const imageFile = req.file?.path;
+    const mimeType = req.file?.mimetype;
+
+    if (!imageFile) {
+      return res.status(400).json({ error: "Image file is required" });
+    }
+
+    if (!allowedImageTypes.includes(mimeType)) {
+      return res.status(400).json({ error: "Invalid file type. Please upload a valid image (jpg, png, webp)." });
+    }
+
+    const cloudUrl = await upload_on_cloudinary(imageFile, 'image');
+    if (!cloudUrl) {
+      return res.status(500).json({ error: "Error uploading image to Cloudinary" });
+    }
+
     const newActivity = new ActivityModel({
-      fileUrl: cloudUrl.url, // Cloudinary URL of the uploaded video
-      activityNo: activityNumber, // The activity number from the URL
-      activityType: "Archimedes", // Default activity type
-      file_type: path.extname(videoFile), // File extension (e.g., .mp4)
-      poster_image: posterImageUrl, // Poster image URL (thumbnail)
+      userId,
+      topic,
+      activityNo,
+      activityType: 'photo',
+      fileUrl: cloudUrl.url,
     });
 
     await newActivity.save();
+    fs.promises.unlink(imageFile);
+    res.status(200).json({ message: "Image uploaded successfully", data: newActivity });
 
-    // Clean up the local file after uploading to Cloudinary
-    fs.promises.unlink(videoFile);
-
-    return res.status(200).json({ "file": newActivity });
   } catch (error) {
-    console.error('Error uploading video:', error);
-    return res.status(500).json({ "error": "Error during video upload" });
+    console.error('Error uploading image:', error);
+    res.status(500).json({ error: "Internal server error during image upload" });
   }
 };
-
-
-const getAllActivities = async (req, res) => {
+const uploadVideoForActivity = async (req, res) => {
   try {
-    // Fetch all activities from the database
-    const activities = await ActivityModel.find({}).sort({ createdAt: -1 }); // Optionally, sort by createdAt to get the most recent first
+    const { userId, topic, activityNo } = req.params;
 
-    if (activities.length === 0) {
-      return res.status(404).json({ message: 'No activities found' });
+    if (!userId || !topic || !activityNo) {
+      return res.status(400).json({ error: "Missing required parameters (userId, topic, activityNo)" });
     }
 
-    // Return the activities data
-    res.status(200).json({ activities });
+    if (!allowedTopics.includes(topic)) {
+      return res.status(400).json({ error: `Invalid topic '${topic}'. Valid topics: ${allowedTopics.join(", ")}` });
+    }
+
+    // Check if activity already exists
+    const existingActivity = await ActivityModel.findOne({
+      userId,
+      topic,
+      activityNo,
+      activityType: 'video'
+    });
+
+    if (existingActivity) {
+      return res.status(400).json({ error: "Video for this activity number and topic already exists." });
+    }
+
+    const videoFile = req.file?.path;
+    const mimeType = req.file?.mimetype;
+
+    if (!videoFile) {
+      return res.status(400).json({ error: "Video file is required" });
+    }
+
+    if (!allowedVideoTypes.includes(mimeType)) {
+      return res.status(400).json({ error: "Invalid file type. Please upload a valid video (mp4, mkv, avi, webm)." });
+    }
+
+    const cloudUrl = await upload_on_cloudinary(videoFile, 'video');
+    if (!cloudUrl) {
+      return res.status(500).json({ error: "Error uploading video to Cloudinary" });
+    }
+
+    const posterImageUrl = cloudUrl.eager?.[0]?.url || null;
+
+    const newActivity = new ActivityModel({
+      userId,
+      topic,
+      activityNo,
+      activityType: 'video',
+      fileUrl: cloudUrl.url,
+      posterImage: posterImageUrl
+    });
+
+    await newActivity.save();
+    fs.promises.unlink(videoFile);
+    res.status(200).json({ message: "Video uploaded successfully", data: newActivity });
+
   } catch (error) {
-    console.error('Error fetching activities:', error);
-    res.status(500).json({ error: 'Server error while fetching activities' });
+    console.error('Error uploading video:', error);
+    res.status(500).json({ error: "Internal server error during video upload" });
   }
 };
 
 
-export { upload, uploadVideoForActivity , getAllActivities};
+
+// 🧩 GET: Fetch all videos by topic
+const getAllVideosByTopic = async (req, res) => {
+  const { topic } = req.params;
+  try {
+    const activities = await ActivityModel.find({ topic, activityType: "video" })
+      .select("activityNo fileUrl posterImage");
+
+    res.status(200).json({ activities });
+  } catch (error) {
+    console.error('Error fetching videos:', error);
+    res.status(500).json({ error: "Error fetching videos" });
+  }
+};
+
+// 🧩 GET: Fetch all images by topic
+const getAllImagesByTopic = async (req, res) => {
+  const { topic } = req.params;
+  try {
+    const activities = await ActivityModel.find({ topic, activityType: "photo" })
+      .select("activityNo fileUrl");
+
+    res.status(200).json({ activities });
+  } catch (error) {
+    console.error('Error fetching images:', error);
+    res.status(500).json({ error: "Error fetching images" });
+  }
+};
+
+export {
+  uploadVideo, uploadImage,
+  uploadImageForActivity, uploadVideoForActivity,
+  getAllVideosByTopic, getAllImagesByTopic
+};

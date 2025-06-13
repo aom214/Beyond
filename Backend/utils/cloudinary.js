@@ -1,7 +1,7 @@
 import { v2 as cloudinary } from 'cloudinary';
 import fs from 'fs/promises';
 
-const upload_on_cloudinary = async (file_url) => {
+const upload_on_cloudinary = async (file_url, resourceType = "auto") => {
   try {
     // Cloudinary configuration
     cloudinary.config({
@@ -12,14 +12,18 @@ const upload_on_cloudinary = async (file_url) => {
 
     if (!file_url) throw new Error("File path is required");
 
-    // Upload the video to Cloudinary and generate a thumbnail using the 'eager' parameter
-    const uploadResult = await cloudinary.uploader.upload(file_url, {
-      resource_type: "video", // Uploading a video file
-      public_id: `uploads/${Date.now()}`, // Unique public ID for the video
-      eager: [{ width: 320, height: 180, crop: "fit" }] // Generate a thumbnail during upload
-    });
+    const uploadOptions = {
+      resource_type: resourceType, // dynamic resource type
+      public_id: `uploads/${Date.now()}`
+    };
 
-    // Return the upload result (which includes the video URL and public_id)
+    // If it's video, also generate eager thumbnail
+    if (resourceType === "video") {
+      uploadOptions.eager = [{ width: 320, height: 180, crop: "fit" }];
+    }
+
+    const uploadResult = await cloudinary.uploader.upload(file_url, uploadOptions);
+
     return uploadResult;
   } catch (error) {
     console.error("Cloudinary Upload Error:", error);

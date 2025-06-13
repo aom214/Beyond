@@ -1,26 +1,31 @@
 import mongoose from "mongoose";
 
 const ActivitySchema = new mongoose.Schema({
-  fileUrl: {
+  userId: {
     type: String,
     required: true,
+  },
+  topic: {
+    type: String,
+    required: true,
+    enum: ["Archimedes", "Marie Curie", "Tesla", "Einstein"], // You can expand this list easily
+  },
+  activityType: {
+    type: String,
+    required: true,
+    enum: ["photo", "video"], // Valid values: photo or video
   },
   activityNo: {
     type: Number,
     required: true,
   },
-  activityType: {
-    type: String,
-    required: true,
-    default: "Archimedes", // Default activity type is "Archimedes"
-  },
-  file_type: {
+  fileUrl: {
     type: String,
     required: true,
   },
-  poster_image:{
-    type:String,
-    required:false
+  posterImage: {  // more conventional to camelCase in JS
+    type: String,
+    required: function() { return this.activityType === "video"; }, // Only required for videos
   }
 }, { timestamps: true });
 
