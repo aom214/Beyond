@@ -4,7 +4,8 @@ import {
   uploadImageForActivity, 
   uploadVideoForActivity,
   getAllVideosByTopic, 
-  getAllImagesByTopic 
+  getAllImagesByTopic,
+  checkActivitySubmissionStatus// <-- ✅ import the new controller here
 } from "../Controller/Activity.controller.js";
 
 const router = express.Router();
@@ -13,5 +14,8 @@ router.post('/:userId/:topic/:activityNo/Image', upload.single('file'), uploadIm
 router.post('/:userId/:topic/:activityNo/Video', upload.single('file'), uploadVideoForActivity);
 router.get('/:userId/:topic/Video', getAllVideosByTopic);
 router.get('/:userId/:topic/Image', getAllImagesByTopic);
+
+// ✅ Add your new GET route
+router.get('/:userId/:topic/:activityNo', checkActivitySubmissionStatus);
 
 export default router;

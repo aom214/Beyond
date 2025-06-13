@@ -39,10 +39,42 @@ const imageFilter = (req, file, cb) => {
 // Expose two different uploaders
 const uploadVideo = multer({ storage, fileFilter: videoFilter });
 const uploadImage = multer({ storage, fileFilter: imageFilter });
-const uploadImageForActivity = async (req, res) => {
+const checkActivitySubmissionStatus = async (req, res) => {
   try {
     const { userId, topic, activityNo } = req.params;
 
+    if (!userId || !topic || !activityNo) {
+      return res.status(400).json({ error: "Missing required parameters (userId, topic, activityNo)" });
+    }
+
+    if (!allowedTopics.includes(topic)) {
+      return res.status(400).json({ error: `Invalid topic '${topic}'. Valid topics: ${allowedTopics.join(", ")}` });
+    }
+
+    // Check for both image and video
+    const photo = await ActivityModel.findOne({ userId, topic, activityNo, activityType: 'photo' });
+    const video = await ActivityModel.findOne({ userId, topic, activityNo, activityType: 'video' });
+
+    const submitted = photo !== null || video !== null;
+
+    res.status(200).json({
+      submitted,
+      details: {
+        photoSubmitted: photo !== null,
+        videoSubmitted: video !== null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error checking activity submission:', error);
+    res.status(500).json({ error: "Internal server error during activity check" });
+  }
+};
+
+const uploadImageForActivity = async (req, res) => {
+  try {
+    const { userId, topic, activityNo } = req.params;
+    console.log(userId)
     if (!userId || !topic || !activityNo) {
       return res.status(400).json({ error: "Missing required parameters (userId, topic, activityNo)" });
     }
@@ -100,6 +132,8 @@ const uploadVideoForActivity = async (req, res) => {
   try {
     const { userId, topic, activityNo } = req.params;
 
+    console.log(userId)
+
     if (!userId || !topic || !activityNo) {
       return res.status(400).json({ error: "Missing required parameters (userId, topic, activityNo)" });
     }
@@ -117,7 +151,7 @@ const uploadVideoForActivity = async (req, res) => {
     });
 
     if (existingActivity) {
-      return res.status(400).json({ error: `Video for this activity number and topic already exists.${userId}` });
+      return res.status(400).json({ error: `Video for this activity number and topic already exists. ${userId}` });
     }
 
     const videoFile = req.file?.path;
@@ -191,5 +225,6 @@ const getAllImagesByTopic = async (req, res) => {
 export {
   uploadVideo, uploadImage,
   uploadImageForActivity, uploadVideoForActivity,
-  getAllVideosByTopic, getAllImagesByTopic
+  getAllVideosByTopic, getAllImagesByTopic,
+  checkActivitySubmissionStatus
 };
