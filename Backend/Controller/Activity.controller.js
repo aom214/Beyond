@@ -4,7 +4,7 @@ import ActivityModel from '../Models/Activity.models.js';
 import upload_on_cloudinary from "../utils/cloudinary.js";
 import fs from 'fs';
 
-const allowedTopics = ["Archimedes", "Marie Curie", "Tesla", "Einstein"];
+const allowedTopics = ["Archimedes", "MarieCurie", "Tesla", "Einstein"]
 const allowedImageTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
 const allowedVideoTypes = ['video/mp4', 'video/mkv', 'video/avi', 'video/webm'];
 

@@ -8,7 +8,7 @@ const ActivitySchema = new mongoose.Schema({
   topic: {
     type: String,
     required: true,
-    enum: ["Archimedes", "Marie Curie", "Tesla", "Einstein"], // You can expand this list easily
+    enum: ["Archimedes", "MarieCurie", "Tesla", "Einstein"], // You can expand this list easily
   },
   activityType: {
     type: String,

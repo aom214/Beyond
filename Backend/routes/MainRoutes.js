@@ -12,8 +12,8 @@ const router = express.Router();
 
 router.post('/:userId/:topic/:activityNo/Image', upload.single('file'), uploadImageForActivity);
 router.post('/:userId/:topic/:activityNo/Video', upload.single('file'), uploadVideoForActivity);
-router.get('/:userId/:topic/Video', getAllVideosByTopic);
-router.get('/:userId/:topic/Image', getAllImagesByTopic);
+router.get('/:topic/Video', getAllVideosByTopic);
+router.get('/:topic/Image', getAllImagesByTopic);
 
 // ✅ Add your new GET route
 router.get('/:userId/:topic/:activityNo', checkActivitySubmissionStatus);
