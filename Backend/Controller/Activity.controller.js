@@ -117,7 +117,7 @@ const uploadVideoForActivity = async (req, res) => {
     });
 
     if (existingActivity) {
-      return res.status(400).json({ error: "Video for this activity number and topic already exists." });
+      return res.status(400).json({ error: `Video for this activity number and topic already exists.${userId}` });
     }
 
     const videoFile = req.file?.path;
@@ -135,6 +135,7 @@ const uploadVideoForActivity = async (req, res) => {
     if (!cloudUrl) {
       return res.status(500).json({ error: "Error uploading video to Cloudinary" });
     }
+
 
     const posterImageUrl = cloudUrl.eager?.[0]?.url || null;
 
